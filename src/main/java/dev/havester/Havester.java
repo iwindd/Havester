@@ -60,6 +60,7 @@ public final class Havester implements ClientModInitializer {
     private static boolean holdJumpEnabled = true;
     private static boolean holdSprintEnabled = true;
     private static int minBambooHeight = 3;
+    private static float heightBonus = 2.0F;
     private static int sellThresholdStacks = 5;
     private static CutterState cutterState = CutterState.IDLE;
     private static BlockPos bambooTarget;
@@ -499,8 +500,8 @@ public final class Havester implements ClientModInitializer {
 
     private static BlockPos findNearestBambooCutTarget(MinecraftClient client, boolean onlyInBreakRange) {
         BlockPos playerPos = client.player.getBlockPos();
-        BlockPos nearest = null;
-        double nearestDistance = Double.MAX_VALUE;
+        BlockPos best = null;
+        double bestScore = Double.MAX_VALUE;
 
         bambooSkipMap.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
         bambooBlacklistMap.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
@@ -513,22 +514,25 @@ public final class Havester implements ClientModInitializer {
                     mutable.set(playerPos.getX() + x, playerPos.getY() + y, playerPos.getZ() + z);
                     if (!isBamboo(client, mutable) || isBamboo(client, mutable.down())) continue;
 
-                    BlockPos cutTarget = getCutTargetForBambooBase(client, mutable);
-                    if (cutTarget == null) continue;
-                    if (!isInsideScanBounds(cutTarget)) continue;
-                    if (bambooSkipMap.containsKey(cutTarget)) continue;
-                    if (bambooBlacklistMap.containsKey(cutTarget)) continue;
+                    CutTarget target = getCutTargetForBambooBase(client, mutable);
+                    if (target == null) continue;
+                    BlockPos cutPos = target.pos();
+                    if (!isInsideScanBounds(cutPos)) continue;
+                    if (bambooSkipMap.containsKey(cutPos)) continue;
+                    if (bambooBlacklistMap.containsKey(cutPos)) continue;
 
-                    double distance = client.player.getEyePos().squaredDistanceTo(Vec3d.ofCenter(cutTarget));
+                    double distance = client.player.getEyePos().squaredDistanceTo(Vec3d.ofCenter(cutPos));
                     if (onlyInBreakRange && distance > BREAK_RANGE_SQUARED) continue;
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        nearest = cutTarget;
+
+                    double score = distance - target.height() * heightBonus;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = cutPos;
                     }
                 }
             }
         }
-        return nearest;
+        return best;
     }
 
     private static ItemEntity findNearestBambooItemEntity(MinecraftClient client) {
@@ -602,18 +606,19 @@ public final class Havester implements ClientModInitializer {
         if (!isBamboo(client, pos)) return false;
         BlockPos base = pos;
         while (isBamboo(client, base.down())) base = base.down();
-        BlockPos cutTarget = getCutTargetForBambooBase(client, base);
-        return pos.equals(cutTarget);
+        CutTarget target = getCutTargetForBambooBase(client, base);
+        return target != null && pos.equals(target.pos());
     }
 
-    private static BlockPos getCutTargetForBambooBase(MinecraftClient client, BlockPos base) {
+    private static CutTarget getCutTargetForBambooBase(MinecraftClient client, BlockPos base) {
         int height = 0;
         BlockPos cursor = base;
         while (isBamboo(client, cursor)) {
             height++;
             cursor = cursor.up();
         }
-        return height < minBambooHeight ? null : base.up().toImmutable();
+        if (height < minBambooHeight) return null;
+        return new CutTarget(base.up().toImmutable(), height);
     }
 
     private static void lookAt(MinecraftClient client, Vec3d target) {
@@ -694,6 +699,8 @@ public final class Havester implements ClientModInitializer {
         return state == CutterState.WALK_TO_BAMBOO || state == CutterState.COLLECTING;
     }
 
+    private record CutTarget(BlockPos pos, int height) {}
+
     private static final class BambooSettingsScreen extends Screen {
         private int scrollY;
         private static final int TOP_Y = 42;
@@ -741,6 +748,8 @@ public final class Havester implements ClientModInitializer {
 
             drawNumberRow(context, "Min Bamboo Height", String.valueOf(minBambooHeight), leftX, rightX, y);
             y += ROW_HEIGHT;
+            drawNumberRow(context, "Height Priority", String.format("%.1f", heightBonus), leftX, rightX, y);
+            y += ROW_HEIGHT;
             drawNumberRow(context, "Sell Threshold Stacks", sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")", leftX, rightX, y);
             y += ROW_HEIGHT;
             drawActionRow(context, "Scan Corner 1: " + formatCorner(scanCorner1), leftX, y);
@@ -770,6 +779,8 @@ public final class Havester implements ClientModInitializer {
             int y = getContentY() + TITLE_GAP;
 
             addNumberControls(y, rightX, () -> minBambooHeight = Math.max(2, minBambooHeight - 1), () -> minBambooHeight = Math.min(10, minBambooHeight + 1));
+            y += ROW_HEIGHT;
+            addNumberControls(y, rightX, () -> heightBonus = Math.max(0F, heightBonus - 0.5F), () -> heightBonus = Math.min(5F, heightBonus + 0.5F));
             y += ROW_HEIGHT;
             addNumberControls(y, rightX, () -> sellThresholdStacks = Math.max(1, sellThresholdStacks - 1), () -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1));
             y += ROW_HEIGHT;
@@ -885,7 +896,7 @@ public final class Havester implements ClientModInitializer {
         }
 
         private int getContentHeight() {
-            return TITLE_GAP + ROW_HEIGHT * 10 + DONE_TOP_GAP + BUTTON_HEIGHT;
+            return TITLE_GAP + ROW_HEIGHT * 11 + DONE_TOP_GAP + BUTTON_HEIGHT;
         }
 
         private int getMaxScroll() {

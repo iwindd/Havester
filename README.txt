@@ -24,8 +24,9 @@ HOW TO USE
 ====================================================================
 SETTINGS (press O)
 
-   Min Bamboo Height      2 - 10    (only cut stacks this tall or more)
-   Sell Threshold Stacks  1 - 10    (auto /shop when bamboo reaches N x 64)
+    Min Bamboo Height      2 - 10    (only cut stacks this tall or more)
+    Height Priority        0.0 - 5.0 (higher = prefer taller bamboo over closer)
+    Sell Threshold Stacks  1 - 10    (auto /shop when bamboo reaches N x 64)
    Scan Corner 1                    (stand at first corner and press Record 1)
     Scan Corner 2                    (stand at opposite corner and press Record 2)
     Zone Overlay                     (green client-only box shows recorded scan area when both corners set)
