@@ -66,7 +66,7 @@ $newBytes = $encoding.GetBytes($jsonContent)
 
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "Install complete!" -ForegroundColor Green
-Write-Host "Keys: K = start/stop  O = settings  P = unpause" -ForegroundColor Cyan
+Write-Host "Keys: K = start/stop  O = settings" -ForegroundColor Cyan
 Write-Host "Restart the game to take effect." -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Green
 

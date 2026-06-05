@@ -53,8 +53,9 @@ public final class Havester implements ClientModInitializer {
 
     private static KeyBinding bambooToggleKey;
     private static KeyBinding bambooSettingsKey;
-    private static KeyBinding unpauseToggleKey;
     private static boolean unpauseEnabled = true;
+    private static boolean autoSellEnabled = true;
+    private static boolean collectingEnabled = true;
     private static boolean bambooCutterActive;
     private static boolean holdWalkEnabled = true;
     private static boolean holdJumpEnabled = true;
@@ -94,12 +95,6 @@ public final class Havester implements ClientModInitializer {
                 GLFW.GLFW_KEY_O,
                 "category.havester"
         ));
-        unpauseToggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.havester.unpause_toggle",
-                InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_P,
-                "category.havester"
-        ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (bambooToggleKey.wasPressed()) {
@@ -107,10 +102,6 @@ public final class Havester implements ClientModInitializer {
             }
             while (bambooSettingsKey.wasPressed()) {
                 client.setScreen(new BambooSettingsScreen());
-            }
-            while (unpauseToggleKey.wasPressed()) {
-                unpauseEnabled = !unpauseEnabled;
-                showStatus(client, unpauseEnabled ? "Unpause: ON" : "Unpause: OFF", 40);
             }
 
             if (unpauseEnabled && client.options.pauseOnLostFocus) {
@@ -161,7 +152,12 @@ public final class Havester implements ClientModInitializer {
         if (cutLockTicks > 0) cutLockTicks--;
         currentTick++;
 
-        if (!isSellingState(cutterState) && countBamboo(client) >= getSellThresholdBamboo()) {
+        if (!autoSellEnabled && isSellingState(cutterState)) {
+            finishSelling(client, "Auto Sell: OFF");
+            return;
+        }
+
+        if (autoSellEnabled && !isSellingState(cutterState) && countBamboo(client) >= getSellThresholdBamboo()) {
             stopMovement(client);
             breakingTarget = null;
             currentPath = List.of();
@@ -206,7 +202,7 @@ public final class Havester implements ClientModInitializer {
         currentPath = List.of();
         pathIndex = 0;
 
-        ItemEntity nearestDrop = findNearestBambooItemEntity(client);
+        ItemEntity nearestDrop = collectingEnabled ? findNearestBambooItemEntity(client) : null;
         if (nearestDrop != null) {
             collectTarget = nearestDrop.getPos();
             BlockPos goal = BlockPos.ofFloored(collectTarget);
@@ -324,6 +320,14 @@ public final class Havester implements ClientModInitializer {
     }
 
     private static void pathToDrops(MinecraftClient client) {
+        if (!collectingEnabled) {
+            collectTarget = null;
+            currentPath = List.of();
+            pathIndex = 0;
+            cutterState = CutterState.FIND_TARGET;
+            return;
+        }
+
         if (collectTarget == null) {
             ItemEntity nearest = findNearestBambooItemEntity(client);
             if (nearest == null) {
@@ -351,6 +355,13 @@ public final class Havester implements ClientModInitializer {
     }
 
     private static void collectDrops(MinecraftClient client) {
+        if (!collectingEnabled) {
+            stopMovement(client);
+            collectTarget = null;
+            cutterState = CutterState.FIND_TARGET;
+            return;
+        }
+
         ItemEntity nearest = findNearestBambooItemEntity(client);
         if (nearest == null) {
             stopMovement(client);
@@ -869,6 +880,12 @@ public final class Havester implements ClientModInitializer {
             y += ROW_HEIGHT;
             drawNumberRow(context, "Sell Threshold Stacks", sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")", leftX, rightX, y);
             y += ROW_HEIGHT;
+            drawToggleRow(context, "Unpause When Tabbed Out", y);
+            y += ROW_HEIGHT;
+            drawToggleRow(context, "Auto Sell", y);
+            y += ROW_HEIGHT;
+            drawToggleRow(context, "Collect Drops", y);
+            y += ROW_HEIGHT;
             drawToggleRow(context, "Hold W Always", y);
             y += ROW_HEIGHT;
             drawToggleRow(context, "Hold Space Always", y);
@@ -886,6 +903,21 @@ public final class Havester implements ClientModInitializer {
             addNumberControls(y, rightX, () -> minBambooHeight = Math.max(2, minBambooHeight - 1), () -> minBambooHeight = Math.min(10, minBambooHeight + 1));
             y += ROW_HEIGHT;
             addNumberControls(y, rightX, () -> sellThresholdStacks = Math.max(1, sellThresholdStacks - 1), () -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1));
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, unpauseEnabled ? "ON" : "OFF", b -> {
+                unpauseEnabled = !unpauseEnabled;
+                b.setMessage(Text.literal(unpauseEnabled ? "ON" : "OFF"));
+            });
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, autoSellEnabled ? "ON" : "OFF", b -> {
+                autoSellEnabled = !autoSellEnabled;
+                b.setMessage(Text.literal(autoSellEnabled ? "ON" : "OFF"));
+            });
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, collectingEnabled ? "ON" : "OFF", b -> {
+                collectingEnabled = !collectingEnabled;
+                b.setMessage(Text.literal(collectingEnabled ? "ON" : "OFF"));
+            });
             y += ROW_HEIGHT;
             addToggleButton(y, rightX, holdWalkEnabled ? "ON" : "OFF", b -> {
                 holdWalkEnabled = !holdWalkEnabled;
@@ -948,7 +980,7 @@ public final class Havester implements ClientModInitializer {
         }
 
         private int getContentHeight() {
-            return TITLE_GAP + ROW_HEIGHT * 4 + DONE_TOP_GAP + BUTTON_HEIGHT;
+            return TITLE_GAP + ROW_HEIGHT * 7 + DONE_TOP_GAP + BUTTON_HEIGHT;
         }
 
         private int getMaxScroll() {

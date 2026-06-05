@@ -20,15 +20,17 @@ HOW TO USE
 
    [K]  Start / Stop Bamboo Cutter
    [O]  Open Settings GUI
-   [P]  Toggle Unpause (game keeps running when tabbed out)
 
 ====================================================================
 SETTINGS (press O)
 
   Min Bamboo Height      2 - 10    (only cut stacks this tall or more)
   Sell Threshold Stacks  1 - 10    (auto /shop when bamboo reaches N x 64)
-   Shop Category Slot     0 - 53    (which slot in /shop GUI is bamboo category)
-   Walk Through Bamboo              (toggle in settings)
+   Unpause When Tabbed Out          (game keeps running when tabbed out)
+   Auto Sell                        (toggle automatic /shop selling)
+   Collect Drops                    (toggle dropped bamboo collection)
+   Hold W Always                    (toggle auto-walk)
+   Hold Space Always                (toggle auto-jump)
 
 ====================================================================
 WHAT IT DOES
