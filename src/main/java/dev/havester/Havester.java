@@ -390,7 +390,7 @@ public final class Havester implements ClientModInitializer {
         stopMovement(client);
         showStatus(client, "Auto Sell: /shop", 20);
         client.player.networkHandler.sendChatCommand("shop");
-        sellWaitTicks = 20;
+        sellWaitTicks = 100;
         cutterState = CutterState.WAIT_SHOP_GUI;
     }
 
