@@ -1,0 +1,3 @@
+- Use the Conventional Commits format (e.g., feat:, fix:).
+- Limit the first line to 50 characters.
+- Use the imperative mood (e.g., 'Add', not 'Added').
