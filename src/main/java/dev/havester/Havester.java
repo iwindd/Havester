@@ -320,10 +320,9 @@ public final class Havester implements ClientModInitializer {
 
     private static void cutTarget(MinecraftClient client) {
         if (bambooTarget == null || !isValidBambooCutTarget(client, bambooTarget)) {
-            if (bambooTarget != null) bambooSkipMap.put(bambooTarget.toImmutable(), currentTick + SKIP_TICKS);
             breakingTarget = null;
             cuttingTicks = 0;
-            cutterState = CutterState.FIND_TARGET;
+            tryFastNextTarget(client);
             return;
         }
 
@@ -361,6 +360,31 @@ public final class Havester implements ClientModInitializer {
             cutterState = CutterState.FIND_TARGET;
             showStatus(client, "Bamboo Cutter: SKIP STUCK", 40);
         }
+    }
+
+    private static void tryFastNextTarget(MinecraftClient client) {
+        bambooTarget = findNearestBambooCutTarget(client, true);
+        if (bambooTarget != null) {
+            breakingTarget = null;
+            cuttingTicks = 0;
+            swingCooldown = 0;
+            cutterState = CutterState.CUTTING;
+            return;
+        }
+
+        if (collectingEnabled) {
+            ItemEntity nearestDrop = findNearestBambooItemEntity(client);
+            if (nearestDrop != null) {
+                collectTarget = nearestDrop.getPos();
+                stuckTicks = 0;
+                stuckThreshold = 0;
+                startMovement(client);
+                cutterState = CutterState.COLLECTING;
+                return;
+            }
+        }
+
+        cutterState = CutterState.FIND_TARGET;
     }
 
     private static void collectDrops(MinecraftClient client) {
