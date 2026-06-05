@@ -27,10 +27,7 @@ SETTINGS (press O)
     Min Bamboo Height      2 - 10    (only cut stacks this tall or more)
     Height Priority        0.0 - 5.0 (higher = prefer taller bamboo over closer)
     Sell Threshold Stacks  1 - 10    (auto /shop when bamboo reaches N x 64)
-   Scan Corner 1                    (stand at first corner and press Record 1)
-    Scan Corner 2                    (stand at opposite corner and press Record 2)
-    Zone Overlay                     (green client-only box shows recorded scan area when both corners set)
-   Unpause When Tabbed Out          (game keeps running when tabbed out)
+    Unpause When Tabbed Out          (game keeps running when tabbed out)
    Auto Sell                        (toggle automatic /shop selling)
    Collect Drops                    (toggle dropped bamboo collection)
     Hold W On Walk                   (toggle auto-walk toward target)
@@ -41,16 +38,15 @@ SETTINGS (press O)
 WHAT IT DOES
 
   1. Cut every reachable bamboo stack first (min height configurable)
-  2. If no bamboo is reachable, walk directly toward the nearest bamboo (no pathfinding)
-  3. Scan only inside the recorded corner box when both corners are set
-  4. Green client-only zone overlay shows the recorded scan area
-  5. Cut block #2 (not the root)
-  6. Collect dropped bamboo items when enabled (walk directly to drops)
-  7. When bamboo in inventory reaches threshold, auto-run /shop when enabled
-  8. Click the category slot, then shift-right-click bamboo to sell
-  9. If stuck walking to bamboo for 10s, blacklist that bamboo for 30s
-  10. If no bamboo, retry every 10 seconds (does not stop)
-  11. Game stays unpaused when tabbing out when enabled
+  2. If no bamboo is reachable, walk directly toward the nearest bamboo
+  3. Prefers taller bamboo (Height Priority setting weights height vs distance)
+  4. Cut block #2 (not the root)
+  5. Collect dropped bamboo items when enabled (walk directly to drops)
+  6. When bamboo in inventory reaches threshold, auto-run /shop when enabled
+  7. Click the category slot, then shift-right-click bamboo to sell
+  8. If stuck walking to bamboo for 0.5s, blacklist that bamboo for 30s
+  9. If no bamboo, retry every 10 seconds (does not stop)
+  10. Game stays unpaused when tabbing out when enabled
 
 ====================================================================
 REQUIREMENTS

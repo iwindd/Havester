@@ -4,20 +4,13 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Items;
 import net.minecraft.screen.slot.Slot;
@@ -65,8 +58,6 @@ public final class Havester implements ClientModInitializer {
     private static CutterState cutterState = CutterState.IDLE;
     private static BlockPos bambooTarget;
     private static BlockPos breakingTarget;
-    private static BlockPos scanCorner1;
-    private static BlockPos scanCorner2;
     private static Vec3d collectTarget;
     private static int swingCooldown;
     private static int stuckTicks;
@@ -142,25 +133,6 @@ public final class Havester implements ClientModInitializer {
             }
         });
 
-        WorldRenderEvents.LAST.register(Havester::renderScanZone);
-    }
-
-    private static void renderScanZone(WorldRenderContext context) {
-        if (scanCorner1 == null || scanCorner2 == null) return;
-
-        VertexConsumerProvider consumers = context.consumers();
-        if (consumers == null) return;
-
-        Vec3d cameraPos = context.camera().getPos();
-        MatrixStack matrices = context.matrixStack();
-        VertexConsumer lines = consumers.getBuffer(RenderLayer.getLines());
-        double minX = Math.min(scanCorner1.getX(), scanCorner2.getX()) - cameraPos.x;
-        double minY = Math.min(scanCorner1.getY(), scanCorner2.getY()) - cameraPos.y;
-        double minZ = Math.min(scanCorner1.getZ(), scanCorner2.getZ()) - cameraPos.z;
-        double maxX = Math.max(scanCorner1.getX(), scanCorner2.getX()) + 1.0D - cameraPos.x;
-        double maxY = Math.max(scanCorner1.getY(), scanCorner2.getY()) + 1.0D - cameraPos.y;
-        double maxZ = Math.max(scanCorner1.getZ(), scanCorner2.getZ()) + 1.0D - cameraPos.z;
-        WorldRenderer.drawBox(matrices, lines, minX, minY, minZ, maxX, maxY, maxZ, 0.2F, 1.0F, 0.2F, 1.0F);
     }
 
     private static void toggleBambooCutter(MinecraftClient client) {
@@ -314,7 +286,7 @@ public final class Havester implements ClientModInitializer {
             client.options.jumpKey.setPressed(holdJumpEnabled);
         }
 
-        if (stuckTicks > 20) {
+        if (stuckTicks > 10) {
             bambooBlacklistMap.put(bambooTarget.toImmutable(), currentTick + BAMBOO_BLACKLIST_TICKS);
             bambooTarget = null;
             cutterState = CutterState.FIND_TARGET;
@@ -517,7 +489,6 @@ public final class Havester implements ClientModInitializer {
                     CutTarget target = getCutTargetForBambooBase(client, mutable);
                     if (target == null) continue;
                     BlockPos cutPos = target.pos();
-                    if (!isInsideScanBounds(cutPos)) continue;
                     if (bambooSkipMap.containsKey(cutPos)) continue;
                     if (bambooBlacklistMap.containsKey(cutPos)) continue;
 
@@ -539,24 +510,9 @@ public final class Havester implements ClientModInitializer {
         itemSkipMap.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
         return client.world.getEntitiesByClass(ItemEntity.class, client.player.getBoundingBox().expand(8.0D), item -> item.getStack().isOf(Items.BAMBOO))
                 .stream()
-                .filter(item -> isInsideScanBounds(BlockPos.ofFloored(item.getPos())))
                 .filter(item -> !itemSkipMap.containsKey(item.getId()))
                 .min(Comparator.comparingDouble(item -> item.squaredDistanceTo(client.player)))
                 .orElse(null);
-    }
-
-    private static boolean isInsideScanBounds(BlockPos pos) {
-        if (scanCorner1 == null || scanCorner2 == null) return true;
-
-        int minX = Math.min(scanCorner1.getX(), scanCorner2.getX());
-        int maxX = Math.max(scanCorner1.getX(), scanCorner2.getX());
-        int minY = Math.min(scanCorner1.getY(), scanCorner2.getY());
-        int maxY = Math.max(scanCorner1.getY(), scanCorner2.getY());
-        int minZ = Math.min(scanCorner1.getZ(), scanCorner2.getZ());
-        int maxZ = Math.max(scanCorner1.getZ(), scanCorner2.getZ());
-        return pos.getX() >= minX && pos.getX() <= maxX
-                && pos.getY() >= minY && pos.getY() <= maxY
-                && pos.getZ() >= minZ && pos.getZ() <= maxZ;
     }
 
     private static int countBamboo(MinecraftClient client) {
@@ -752,10 +708,6 @@ public final class Havester implements ClientModInitializer {
             y += ROW_HEIGHT;
             drawNumberRow(context, "Sell Threshold Stacks", sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")", leftX, rightX, y);
             y += ROW_HEIGHT;
-            drawActionRow(context, "Scan Corner 1: " + formatCorner(scanCorner1), leftX, y);
-            y += ROW_HEIGHT;
-            drawActionRow(context, "Scan Corner 2: " + formatCorner(scanCorner2), leftX, y);
-            y += ROW_HEIGHT;
             drawToggleRow(context, "Unpause When Tabbed Out", y);
             y += ROW_HEIGHT;
             drawToggleRow(context, "Auto Sell", y);
@@ -783,10 +735,6 @@ public final class Havester implements ClientModInitializer {
             addNumberControls(y, rightX, () -> heightBonus = Math.max(0F, heightBonus - 0.5F), () -> heightBonus = Math.min(5F, heightBonus + 0.5F));
             y += ROW_HEIGHT;
             addNumberControls(y, rightX, () -> sellThresholdStacks = Math.max(1, sellThresholdStacks - 1), () -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1));
-            y += ROW_HEIGHT;
-            addActionButton(y, rightX, "Record 1", b -> recordScanCorner(1));
-            y += ROW_HEIGHT;
-            addActionButton(y, rightX, "Record 2", b -> recordScanCorner(2));
             y += ROW_HEIGHT;
             addToggleButton(y, rightX, unpauseEnabled ? "ON" : "OFF", b -> {
                 unpauseEnabled = !unpauseEnabled;
@@ -841,12 +789,6 @@ public final class Havester implements ClientModInitializer {
                     .build());
         }
 
-        private void addActionButton(int y, int rightX, String label, ButtonWidget.PressAction onPress) {
-            addDrawableChild(ButtonWidget.builder(Text.literal(label), onPress)
-                    .dimensions(rightX - TOGGLE_WIDTH, y, TOGGLE_WIDTH, BUTTON_HEIGHT)
-                    .build());
-        }
-
         private void drawNumberRow(DrawContext context, String label, String value, int leftX, int rightX, int y) {
             int plusX = rightX - SMALL_BUTTON_WIDTH;
             int valueX = plusX - CONTROL_GAP - VALUE_WIDTH;
@@ -856,27 +798,6 @@ public final class Havester implements ClientModInitializer {
 
         private void drawToggleRow(DrawContext context, String label, int y) {
             context.drawTextWithShadow(this.textRenderer, Text.literal(label), getLeftX(), y + 6, 0xFFFFFF);
-        }
-
-        private void drawActionRow(DrawContext context, String label, int leftX, int y) {
-            context.drawTextWithShadow(this.textRenderer, Text.literal(label), leftX, y + 6, 0xFFFFFF);
-        }
-
-        private void recordScanCorner(int corner) {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.player == null) return;
-
-            BlockPos pos = client.player.getBlockPos().toImmutable();
-            if (corner == 1) {
-                scanCorner1 = pos;
-            } else {
-                scanCorner2 = pos;
-            }
-            showStatus(client, "Scan Corner " + corner + ": " + formatCorner(pos), 60);
-        }
-
-        private String formatCorner(BlockPos pos) {
-            return pos == null ? "Not Set" : pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
         }
 
         private int getLeftX() {
@@ -896,7 +817,7 @@ public final class Havester implements ClientModInitializer {
         }
 
         private int getContentHeight() {
-            return TITLE_GAP + ROW_HEIGHT * 11 + DONE_TOP_GAP + BUTTON_HEIGHT;
+            return TITLE_GAP + ROW_HEIGHT * 9 + DONE_TOP_GAP + BUTTON_HEIGHT;
         }
 
         private int getMaxScroll() {
