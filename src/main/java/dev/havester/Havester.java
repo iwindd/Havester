@@ -39,13 +39,13 @@ public final class Havester implements ClientModInitializer {
     private static final int COLOR = 0xFFFFFF;
     private static final int STATUS_COLOR = 0x55FF55;
     private static final int SEARCH_RADIUS = 32;
-    private static final double BREAK_RANGE = 5.0D;
+    private static final double BREAK_RANGE = 3.0D;
     private static final double BREAK_RANGE_SQUARED = BREAK_RANGE * BREAK_RANGE;
     private static final double COLLECT_DISTANCE_SQUARED = 1.5D;
     private static final int SKIP_TICKS = 200;
     private static final int NO_BAMBOO_RETRY_TICKS = 200;
     private static final int BAMBOO_BLACKLIST_TICKS = 600;
-    private static final int WALK_STUCK_SEC = 10;
+    private static final int WALK_STUCK_SEC = 5;
     private static final Map<BlockPos, Long> bambooSkipMap = new HashMap<>();
     private static final Map<BlockPos, Long> bambooBlacklistMap = new HashMap<>();
     private static final Map<Integer, Long> itemSkipMap = new HashMap<>();
@@ -70,6 +70,7 @@ public final class Havester implements ClientModInitializer {
     private static Vec3d collectTarget;
     private static int swingCooldown;
     private static int stuckTicks;
+    private static int cuttingTicks;
     private static int stuckThreshold;
     private static int sellWaitTicks;
     private static int sellAttempts;
@@ -129,6 +130,16 @@ public final class Havester implements ClientModInitializer {
                 String bambooText = "Bamboo: " + countBamboo(client) + "/" + getSellThresholdBamboo();
                 int bambooX = (client.getWindow().getScaledWidth() - client.textRenderer.getWidth(bambooText)) / 2;
                 drawContext.drawTextWithShadow(client.textRenderer, bambooText, bambooX, PADDING + 12, 0xFFFF55);
+
+                if (bambooCutterActive && cutterState == CutterState.CUTTING) {
+                    String debugText = "CUTTING tick:" + cuttingTicks + " target:" + (bambooTarget != null ? (bambooTarget.getX() + "," + bambooTarget.getY() + "," + bambooTarget.getZ()) : "null");
+                    int dx = (client.getWindow().getScaledWidth() - client.textRenderer.getWidth(debugText)) / 2;
+                    drawContext.drawTextWithShadow(client.textRenderer, debugText, dx, PADDING + 24, 0xFF5555);
+                } else if (bambooCutterActive && cutterState == CutterState.WALK_TO_BAMBOO) {
+                    String debugText = "WALKING stuck:" + stuckTicks + "/" + stuckThreshold + " target:" + (bambooTarget != null ? (bambooTarget.getX() + "," + bambooTarget.getY() + "," + bambooTarget.getZ()) : "null");
+                    int dx = (client.getWindow().getScaledWidth() - client.textRenderer.getWidth(debugText)) / 2;
+                    drawContext.drawTextWithShadow(client.textRenderer, debugText, dx, PADDING + 24, 0xFF5555);
+                }
             }
         });
 
@@ -281,6 +292,24 @@ public final class Havester implements ClientModInitializer {
             stuckTicks++;
         }
 
+        client.options.forwardKey.setPressed(holdWalkEnabled);
+        client.options.sprintKey.setPressed(holdSprintEnabled);
+
+        if (stuckTicks > 20) {
+            boolean strafeLeft = (stuckTicks / 20) % 2 == 0;
+            client.options.leftKey.setPressed(strafeLeft);
+            client.options.rightKey.setPressed(!strafeLeft);
+            client.options.jumpKey.setPressed(true);
+            if (stuckTicks % 60 == 0) {
+                float yaw = client.player.getYaw() + (Math.random() > 0.5F ? 90.0F : -90.0F);
+                client.player.setYaw(yaw);
+            }
+        } else {
+            client.options.leftKey.setPressed(false);
+            client.options.rightKey.setPressed(false);
+            client.options.jumpKey.setPressed(holdJumpEnabled);
+        }
+
         if (stuckTicks > stuckThreshold) {
             bambooBlacklistMap.put(bambooTarget.toImmutable(), currentTick + BAMBOO_BLACKLIST_TICKS);
             bambooTarget = null;
@@ -291,7 +320,9 @@ public final class Havester implements ClientModInitializer {
 
     private static void cutTarget(MinecraftClient client) {
         if (bambooTarget == null || !isValidBambooCutTarget(client, bambooTarget)) {
+            if (bambooTarget != null) bambooSkipMap.put(bambooTarget.toImmutable(), currentTick + SKIP_TICKS);
             breakingTarget = null;
+            cuttingTicks = 0;
             cutterState = CutterState.FIND_TARGET;
             return;
         }
@@ -301,7 +332,9 @@ public final class Havester implements ClientModInitializer {
             lookAt(client, targetCenter);
         }
         if (!isInBreakRange(client, bambooTarget)) {
+            bambooSkipMap.put(bambooTarget.toImmutable(), currentTick + SKIP_TICKS);
             breakingTarget = null;
+            cuttingTicks = 0;
             cutterState = CutterState.FIND_TARGET;
             return;
         }
@@ -311,12 +344,22 @@ public final class Havester implements ClientModInitializer {
         if (!bambooTarget.equals(breakingTarget)) {
             client.interactionManager.attackBlock(bambooTarget, Direction.UP);
             breakingTarget = bambooTarget;
+            cuttingTicks = 0;
             swingCooldown = 0;
         }
         client.interactionManager.updateBlockBreakingProgress(bambooTarget, Direction.UP);
         if (swingCooldown-- <= 0) {
             client.player.swingHand(Hand.MAIN_HAND);
             swingCooldown = 4;
+        }
+
+        cuttingTicks++;
+        if (cuttingTicks > 60) {
+            bambooSkipMap.put(bambooTarget.toImmutable(), currentTick + SKIP_TICKS);
+            breakingTarget = null;
+            cuttingTicks = 0;
+            cutterState = CutterState.FIND_TARGET;
+            showStatus(client, "Bamboo Cutter: SKIP STUCK", 40);
         }
     }
 
@@ -450,7 +493,7 @@ public final class Havester implements ClientModInitializer {
                     if (bambooSkipMap.containsKey(cutTarget)) continue;
                     if (bambooBlacklistMap.containsKey(cutTarget)) continue;
 
-                    double distance = client.player.getPos().squaredDistanceTo(Vec3d.ofCenter(cutTarget));
+                    double distance = client.player.getEyePos().squaredDistanceTo(Vec3d.ofCenter(cutTarget));
                     if (onlyInBreakRange && distance > BREAK_RANGE_SQUARED) continue;
                     if (distance < nearestDistance) {
                         nearestDistance = distance;
@@ -563,12 +606,16 @@ public final class Havester implements ClientModInitializer {
         client.options.forwardKey.setPressed(holdWalkEnabled);
         client.options.sprintKey.setPressed(holdSprintEnabled);
         client.options.jumpKey.setPressed(holdJumpEnabled);
+        client.options.leftKey.setPressed(false);
+        client.options.rightKey.setPressed(false);
     }
 
     private static void stopMovement(MinecraftClient client) {
         client.options.forwardKey.setPressed(false);
         client.options.jumpKey.setPressed(false);
         client.options.sprintKey.setPressed(false);
+        client.options.leftKey.setPressed(false);
+        client.options.rightKey.setPressed(false);
     }
 
     private static void resetWork() {
@@ -578,6 +625,7 @@ public final class Havester implements ClientModInitializer {
         collectTarget = null;
         swingCooldown = 0;
         stuckTicks = 0;
+        cuttingTicks = 0;
         stuckThreshold = 0;
         sellWaitTicks = 0;
         sellAttempts = 0;
