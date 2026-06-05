@@ -29,8 +29,9 @@ SETTINGS (press O)
    Unpause When Tabbed Out          (game keeps running when tabbed out)
    Auto Sell                        (toggle automatic /shop selling)
    Collect Drops                    (toggle dropped bamboo collection)
-   Hold W Always                    (toggle auto-walk)
-   Hold Space Always                (toggle auto-jump)
+   Hold W On Path                   (toggle auto-walk while pathing)
+   Hold Jump On Path                (toggle auto-jump while pathing)
+   Hold Sprint On Path              (toggle auto-sprint while pathing)
 
 ====================================================================
 WHAT IT DOES

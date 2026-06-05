@@ -59,6 +59,7 @@ public final class Havester implements ClientModInitializer {
     private static boolean bambooCutterActive;
     private static boolean holdWalkEnabled = true;
     private static boolean holdJumpEnabled = true;
+    private static boolean holdSprintEnabled = true;
     private static int minBambooHeight = 3;
     private static int sellThresholdStacks = 5;
     private static CutterState cutterState = CutterState.IDLE;
@@ -186,12 +187,8 @@ public final class Havester implements ClientModInitializer {
             }
         }
 
-        if (bambooCutterActive && holdWalkEnabled && cutterState != CutterState.CUTTING) {
-            client.options.forwardKey.setPressed(true);
-        }
-
-        if (bambooCutterActive && holdJumpEnabled && cutterState != CutterState.CUTTING) {
-            client.options.jumpKey.setPressed(true);
+        if (!isPathingState(cutterState)) {
+            stopMovement(client);
         }
     }
 
@@ -275,6 +272,7 @@ public final class Havester implements ClientModInitializer {
 
         showStatus(client, "Bamboo Cutter: PATHING", 8);
         if (!followPath(client)) {
+            stopMovement(client);
             if (repathCooldown == 0) {
                 repathCooldown = 20;
                 cutterState = CutterState.FIND_TARGET;
@@ -342,7 +340,10 @@ public final class Havester implements ClientModInitializer {
         }
 
         showStatus(client, "Bamboo Cutter: COLLECTING", 8);
-        if (!followPath(client) && repathCooldown == 0) {
+        if (!followPath(client)) {
+            stopMovement(client);
+            if (repathCooldown > 0) return;
+
             ItemEntity nearest = findNearestBambooItemEntity(client);
             if (nearest == null) {
                 cutterState = CutterState.FIND_TARGET;
@@ -372,7 +373,6 @@ public final class Havester implements ClientModInitializer {
 
         showStatus(client, "Bamboo Cutter: COLLECTING", 8);
         lookAt(client, collectTarget);
-        client.options.forwardKey.setPressed(true);
         if (client.player.getPos().squaredDistanceTo(collectTarget) <= COLLECT_DISTANCE_SQUARED) {
             stopMovement(client);
             cutterState = CutterState.FIND_TARGET;
@@ -496,11 +496,12 @@ public final class Havester implements ClientModInitializer {
         }
 
         lookAt(client, nextCenter.add(0.0D, 1.0D, 0.0D));
-        client.options.forwardKey.setPressed(true);
+        client.options.forwardKey.setPressed(holdWalkEnabled);
+        client.options.sprintKey.setPressed(holdSprintEnabled);
         BlockPos playerFeet = client.player.getBlockPos();
         boolean movingUp = next.getY() > playerFeet.getY();
         boolean movingDown = next.getY() < playerFeet.getY() && isFallableLanding(client, next);
-        client.options.jumpKey.setPressed(movingUp || movingDown && playerFeet.getY() - next.getY() <= 1);
+        client.options.jumpKey.setPressed(holdJumpEnabled && (movingUp || movingDown && playerFeet.getY() - next.getY() <= 1));
         return true;
     }
 
@@ -775,6 +776,7 @@ public final class Havester implements ClientModInitializer {
     private static void stopMovement(MinecraftClient client) {
         client.options.forwardKey.setPressed(false);
         client.options.jumpKey.setPressed(false);
+        client.options.sprintKey.setPressed(false);
     }
 
     private static void resetWork() {
@@ -826,6 +828,10 @@ public final class Havester implements ClientModInitializer {
                 || state == CutterState.WAIT_BAMBOO_GUI
                 || state == CutterState.SELL_BAMBOO
                 || state == CutterState.WAIT_SELL_DONE;
+    }
+
+    private static boolean isPathingState(CutterState state) {
+        return state == CutterState.PATH_TO_BAMBOO || state == CutterState.PATH_TO_DROPS;
     }
 
     private record PathNode(BlockPos pos, double score) {
@@ -886,9 +892,11 @@ public final class Havester implements ClientModInitializer {
             y += ROW_HEIGHT;
             drawToggleRow(context, "Collect Drops", y);
             y += ROW_HEIGHT;
-            drawToggleRow(context, "Hold W Always", y);
+            drawToggleRow(context, "Hold W On Path", y);
             y += ROW_HEIGHT;
-            drawToggleRow(context, "Hold Space Always", y);
+            drawToggleRow(context, "Hold Jump On Path", y);
+            y += ROW_HEIGHT;
+            drawToggleRow(context, "Hold Sprint On Path", y);
         }
 
         private void relayout() {
@@ -927,6 +935,11 @@ public final class Havester implements ClientModInitializer {
             addToggleButton(y, rightX, holdJumpEnabled ? "ON" : "OFF", b -> {
                 holdJumpEnabled = !holdJumpEnabled;
                 b.setMessage(Text.literal(holdJumpEnabled ? "ON" : "OFF"));
+            });
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, holdSprintEnabled ? "ON" : "OFF", b -> {
+                holdSprintEnabled = !holdSprintEnabled;
+                b.setMessage(Text.literal(holdSprintEnabled ? "ON" : "OFF"));
             });
             y += DONE_TOP_GAP + ROW_HEIGHT;
             addDrawableChild(ButtonWidget.builder(Text.literal("Done"), b -> close())
@@ -980,7 +993,7 @@ public final class Havester implements ClientModInitializer {
         }
 
         private int getContentHeight() {
-            return TITLE_GAP + ROW_HEIGHT * 7 + DONE_TOP_GAP + BUTTON_HEIGHT;
+            return TITLE_GAP + ROW_HEIGHT * 8 + DONE_TOP_GAP + BUTTON_HEIGHT;
         }
 
         private int getMaxScroll() {
