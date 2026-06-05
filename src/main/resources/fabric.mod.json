@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "havester",
+  "version": "${version}",
+  "name": "Havester",
+  "description": "Small client overlay for CobblemonOrigins.",
+  "authors": [
+    "CobblemonOrigins"
+  ],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.havester.Havester"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "~1.21.1",
+    "fabric-api": "*"
+  }
+}
