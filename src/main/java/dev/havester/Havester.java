@@ -821,55 +821,139 @@ public final class Havester implements ClientModInitializer {
     }
 
     private static final class BambooSettingsScreen extends Screen {
+        private int scrollY;
+        private static final int TOP_Y = 42;
+        private static final int BOTTOM_PADDING = 24;
+        private static final int MAX_CONTENT_WIDTH = 360;
+        private static final int ROW_HEIGHT = 34;
+        private static final int TITLE_GAP = 28;
+        private static final int DONE_TOP_GAP = 18;
+        private static final int SMALL_BUTTON_WIDTH = 24;
+        private static final int VALUE_WIDTH = 72;
+        private static final int CONTROL_GAP = 8;
+        private static final int TOGGLE_WIDTH = 112;
+        private static final int BUTTON_HEIGHT = 20;
+        private static final int SCROLL_STEP = 20;
+
         private BambooSettingsScreen() {
             super(Text.literal("Bamboo Cutter Settings"));
         }
 
         @Override
+        public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+            int maxScroll = getMaxScroll();
+            if (maxScroll <= 0) return false;
+
+            scrollY = MathHelper.clamp(scrollY + (int) (verticalAmount * SCROLL_STEP), -maxScroll, 0);
+            relayout();
+            return true;
+        }
+
+        @Override
         protected void init() {
-            int centerX = this.width / 2;
-            int centerY = this.height / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal("-"), button -> minBambooHeight = Math.max(2, minBambooHeight - 1))
-                    .dimensions(centerX - 85, centerY - 10, 40, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("+"), button -> minBambooHeight = Math.min(10, minBambooHeight + 1))
-                    .dimensions(centerX + 45, centerY - 10, 40, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("-"), button -> sellThresholdStacks = Math.max(1, sellThresholdStacks - 1))
-                    .dimensions(centerX - 85, centerY + 38, 40, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("+"), button -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1))
-                    .dimensions(centerX + 45, centerY + 38, 40, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal(holdWalkEnabled ? "Hold W: ON" : "Hold W: OFF"), button -> {
-                        holdWalkEnabled = !holdWalkEnabled;
-                        button.setMessage(Text.literal(holdWalkEnabled ? "Hold W: ON" : "Hold W: OFF"));
-                    })
-                    .dimensions(centerX - 50, centerY + 158, 100, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal(holdJumpEnabled ? "Hold Space: ON" : "Hold Space: OFF"), button -> {
-                        holdJumpEnabled = !holdJumpEnabled;
-                        button.setMessage(Text.literal(holdJumpEnabled ? "Hold Space: ON" : "Hold Space: OFF"));
-                    })
-                    .dimensions(centerX - 50, centerY + 194, 100, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Done"), button -> close())
-                    .dimensions(centerX - 50, centerY + 230, 100, 20)
-                    .build());
+            scrollY = MathHelper.clamp(scrollY, -getMaxScroll(), 0);
+            addControls();
         }
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             super.render(context, mouseX, mouseY, delta);
-            int centerX = this.width / 2;
-            int centerY = this.height / 2;
-            context.drawCenteredTextWithShadow(this.textRenderer, this.title, centerX, centerY - 70, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Min Bamboo Height"), centerX, centerY - 34, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(String.valueOf(minBambooHeight)), centerX, centerY - 4, 0x55FF55);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Sell Threshold Stacks"), centerX, centerY + 14, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")"), centerX, centerY + 44, 0xFFFF55);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold W Always"), centerX, centerY + 60, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold Space Always"), centerX, centerY + 112, 0xFFFFFF);
+            int leftX = getLeftX();
+            int rightX = getRightX();
+            int y = getContentY();
+
+            context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, y, 0xFFFFFF);
+            y += TITLE_GAP;
+
+            drawNumberRow(context, "Min Bamboo Height", String.valueOf(minBambooHeight), leftX, rightX, y);
+            y += ROW_HEIGHT;
+            drawNumberRow(context, "Sell Threshold Stacks", sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")", leftX, rightX, y);
+            y += ROW_HEIGHT;
+            drawToggleRow(context, "Hold W Always", y);
+            y += ROW_HEIGHT;
+            drawToggleRow(context, "Hold Space Always", y);
+        }
+
+        private void relayout() {
+            clearChildren();
+            addControls();
+        }
+
+        private void addControls() {
+            int rightX = getRightX();
+            int y = getContentY() + TITLE_GAP;
+
+            addNumberControls(y, rightX, () -> minBambooHeight = Math.max(2, minBambooHeight - 1), () -> minBambooHeight = Math.min(10, minBambooHeight + 1));
+            y += ROW_HEIGHT;
+            addNumberControls(y, rightX, () -> sellThresholdStacks = Math.max(1, sellThresholdStacks - 1), () -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1));
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, holdWalkEnabled ? "ON" : "OFF", b -> {
+                holdWalkEnabled = !holdWalkEnabled;
+                b.setMessage(Text.literal(holdWalkEnabled ? "ON" : "OFF"));
+            });
+            y += ROW_HEIGHT;
+            addToggleButton(y, rightX, holdJumpEnabled ? "ON" : "OFF", b -> {
+                holdJumpEnabled = !holdJumpEnabled;
+                b.setMessage(Text.literal(holdJumpEnabled ? "ON" : "OFF"));
+            });
+            y += DONE_TOP_GAP + ROW_HEIGHT;
+            addDrawableChild(ButtonWidget.builder(Text.literal("Done"), b -> close())
+                    .dimensions(rightX - TOGGLE_WIDTH, y, TOGGLE_WIDTH, BUTTON_HEIGHT)
+                    .build());
+        }
+
+        private void addNumberControls(int y, int rightX, Runnable onDecrease, Runnable onIncrease) {
+            int plusX = rightX - SMALL_BUTTON_WIDTH;
+            int valueX = plusX - CONTROL_GAP - VALUE_WIDTH;
+            int minusX = valueX - CONTROL_GAP - SMALL_BUTTON_WIDTH;
+            addDrawableChild(ButtonWidget.builder(Text.literal("-"), b -> onDecrease.run())
+                    .dimensions(minusX, y, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT)
+                    .build());
+            addDrawableChild(ButtonWidget.builder(Text.literal("+"), b -> onIncrease.run())
+                    .dimensions(plusX, y, SMALL_BUTTON_WIDTH, BUTTON_HEIGHT)
+                    .build());
+        }
+
+        private void addToggleButton(int y, int rightX, String label, ButtonWidget.PressAction onPress) {
+            addDrawableChild(ButtonWidget.builder(Text.literal(label), onPress)
+                    .dimensions(rightX - TOGGLE_WIDTH, y, TOGGLE_WIDTH, BUTTON_HEIGHT)
+                    .build());
+        }
+
+        private void drawNumberRow(DrawContext context, String label, String value, int leftX, int rightX, int y) {
+            int plusX = rightX - SMALL_BUTTON_WIDTH;
+            int valueX = plusX - CONTROL_GAP - VALUE_WIDTH;
+            context.drawTextWithShadow(this.textRenderer, Text.literal(label), leftX, y + 6, 0xFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(value), valueX + VALUE_WIDTH / 2, y + 6, 0x55FF55);
+        }
+
+        private void drawToggleRow(DrawContext context, String label, int y) {
+            context.drawTextWithShadow(this.textRenderer, Text.literal(label), getLeftX(), y + 6, 0xFFFFFF);
+        }
+
+        private int getLeftX() {
+            return (this.width - getContentWidth()) / 2;
+        }
+
+        private int getRightX() {
+            return getLeftX() + getContentWidth();
+        }
+
+        private int getContentWidth() {
+            return Math.min(MAX_CONTENT_WIDTH, this.width - 40);
+        }
+
+        private int getContentY() {
+            return TOP_Y + scrollY;
+        }
+
+        private int getContentHeight() {
+            return TITLE_GAP + ROW_HEIGHT * 4 + DONE_TOP_GAP + BUTTON_HEIGHT;
+        }
+
+        private int getMaxScroll() {
+            int availableHeight = this.height - TOP_Y - BOTTOM_PADDING;
+            return Math.max(0, getContentHeight() - availableHeight);
         }
     }
 }
