@@ -60,7 +60,6 @@ public final class Havester implements ClientModInitializer {
     private static boolean holdJumpEnabled = true;
     private static int minBambooHeight = 3;
     private static int sellThresholdStacks = 5;
-    private static int shopCategorySlot = 31;
     private static CutterState cutterState = CutterState.IDLE;
     private static BlockPos bambooTarget;
     private static BlockPos breakingTarget;
@@ -380,7 +379,7 @@ public final class Havester implements ClientModInitializer {
     private static void waitShopGui(MinecraftClient client) {
         stopMovement(client);
         showStatus(client, "Auto Sell: SHOP", 8);
-        if (isValidContainerSlot(client, shopCategorySlot)) {
+        if (isValidContainerSlot(client, 31)) {
             cutterState = CutterState.CLICK_CATEGORY_SLOT;
             return;
         }
@@ -390,15 +389,15 @@ public final class Havester implements ClientModInitializer {
     }
 
     private static void clickCategorySlot(MinecraftClient client) {
-        if (!isValidContainerSlot(client, shopCategorySlot)) {
-            finishSelling(client, "Auto Sell: BAD SLOT " + shopCategorySlot);
+        if (!isValidContainerSlot(client, 31)) {
+            finishSelling(client, "Auto Sell: BAD SLOT 31");
             return;
         }
 
-        client.interactionManager.clickSlot(client.player.currentScreenHandler.syncId, shopCategorySlot, 0, SlotActionType.PICKUP, client.player);
+        client.interactionManager.clickSlot(client.player.currentScreenHandler.syncId, 31, 0, SlotActionType.PICKUP, client.player);
         sellWaitTicks = 10;
         cutterState = CutterState.WAIT_BAMBOO_GUI;
-        showStatus(client, "Auto Sell: SLOT " + shopCategorySlot, 20);
+        showStatus(client, "Auto Sell: SLOT 31", 20);
     }
 
     private static void waitBambooGui(MinecraftClient client) {
@@ -842,12 +841,6 @@ public final class Havester implements ClientModInitializer {
             addDrawableChild(ButtonWidget.builder(Text.literal("+"), button -> sellThresholdStacks = Math.min(10, sellThresholdStacks + 1))
                     .dimensions(centerX + 45, centerY + 38, 40, 20)
                     .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("-"), button -> shopCategorySlot = Math.max(0, shopCategorySlot - 1))
-                    .dimensions(centerX - 85, centerY + 84, 40, 20)
-                    .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("+"), button -> shopCategorySlot = Math.min(53, shopCategorySlot + 1))
-                    .dimensions(centerX + 45, centerY + 84, 40, 20)
-                    .build());
             addDrawableChild(ButtonWidget.builder(Text.literal(holdWalkEnabled ? "Hold W: ON" : "Hold W: OFF"), button -> {
                         holdWalkEnabled = !holdWalkEnabled;
                         button.setMessage(Text.literal(holdWalkEnabled ? "Hold W: ON" : "Hold W: OFF"));
@@ -875,10 +868,8 @@ public final class Havester implements ClientModInitializer {
             context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(String.valueOf(minBambooHeight)), centerX, centerY - 4, 0x55FF55);
             context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Sell Threshold Stacks"), centerX, centerY + 14, 0xFFFFFF);
             context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(sellThresholdStacks + " stacks (" + getSellThresholdBamboo() + ")"), centerX, centerY + 44, 0xFFFF55);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Shop Category Slot"), centerX, centerY + 60, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(String.valueOf(shopCategorySlot)), centerX, centerY + 90, 0x55FFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold W Always"), centerX, centerY + 112, 0xFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold Space Always"), centerX, centerY + 184, 0xFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold W Always"), centerX, centerY + 60, 0xFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Hold Space Always"), centerX, centerY + 112, 0xFFFFFF);
         }
     }
 }
